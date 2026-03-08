@@ -8,13 +8,13 @@
 
 :root {
   --bg: #080808;
-  --surface: #111111;
-  --surface2: #1a1a1a;
-  --border: #222222;
-  --border2: #2a2a2a;
+  --surface: #141414;
+  --surface2: #1e1e1e;
+  --border: #2a2a2a;
+  --border2: #333333;
   --text: #f0f0f0;
-  --text2: #888888;
-  --text3: #555555;
+  --text2: #aaaaaa;
+  --text3: #777777;
   --accent: #e8ff47;
   --accent2: #ff6b35;
   --accent3: #7c3aed;

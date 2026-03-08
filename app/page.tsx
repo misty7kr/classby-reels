@@ -359,14 +359,14 @@ export default function Page() {
         <div style={{ width: "100%", maxWidth: 420 }}>
           {/* Logo */}
           <div style={{ marginBottom: 40, textAlign: "center" }}>
-            <div style={{ fontFamily: "Syne, sans-serif", fontSize: 11, letterSpacing: "0.25em", color: "#555", marginBottom: 12, textTransform: "uppercase" }}>
+            <div style={{ fontFamily: "Syne, sans-serif", fontSize: 11, letterSpacing: "0.25em", color: "#aaa", marginBottom: 12, textTransform: "uppercase" }}>
               ClassBy
             </div>
             <h1 style={{ fontFamily: "Syne, sans-serif", fontSize: 32, fontWeight: 800, color: "#f0f0f0", letterSpacing: "-0.02em", lineHeight: 1.1 }}>
               Reels<br />
               <span style={{ color: "#e8ff47" }}>Studio</span>
             </h1>
-            <p style={{ marginTop: 12, color: "#555", fontSize: 13 }}>
+            <p style={{ marginTop: 12, color: "#aaa", fontSize: 13 }}>
               설득형 AI 쇼츠 자동화 · 전용 서비스
             </p>
           </div>
@@ -409,7 +409,7 @@ export default function Page() {
             </button>
           </div>
 
-          <p style={{ marginTop: 20, textAlign: "center", color: "#333", fontSize: 12 }}>
+          <p style={{ marginTop: 20, textAlign: "center", color: "#888", fontSize: 12 }}>
             ClassBy 주 7회 플랜 전용 서비스입니다.
           </p>
         </div>
@@ -435,11 +435,11 @@ export default function Page() {
           <span style={{ fontFamily: "Syne, sans-serif", fontWeight: 800, fontSize: 18, letterSpacing: "-0.02em" }}>
             ClassBy <span style={{ color: "#e8ff47" }}>Reels</span>
           </span>
-          <span style={{ fontSize: 11, letterSpacing: "0.12em", color: "#333", textTransform: "uppercase" }}>
+          <span style={{ fontSize: 11, letterSpacing: "0.12em", color: "#888", textTransform: "uppercase" }}>
             Studio
           </span>
         </div>
-        <div style={{ fontSize: 12, color: "#333" }}>
+        <div style={{ fontSize: 12, color: "#888" }}>
           AI · Canvas · Export
         </div>
       </header>
@@ -534,7 +534,7 @@ export default function Page() {
                     <div style={{ fontSize: 13, fontWeight: 600, color: tone === t.value ? "#f0f0f0" : "#555" }}>
                       {t.label}
                     </div>
-                    <div style={{ fontSize: 11, color: "#333", marginTop: 2 }}>{t.desc}</div>
+                    <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{t.desc}</div>
                   </div>
                 </button>
               ))}
@@ -591,7 +591,7 @@ export default function Page() {
             padding: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 16,
           }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-              <span style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#444" }}>
+              <span style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#999" }}>
                 Preview · 9:16
               </span>
               {result && (
@@ -624,7 +624,7 @@ export default function Page() {
                 <div style={{
                   position: "absolute", inset: 0, display: "flex",
                   alignItems: "center", justifyContent: "center",
-                  color: "#333", fontSize: 13, textAlign: "center",
+                  color: "#888", fontSize: 13, textAlign: "center",
                   pointerEvents: "none",
                 }} />
               )}
@@ -652,7 +652,7 @@ export default function Page() {
           {/* 컷 에디터 */}
           {result && (
             <div style={{ background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: 16, padding: 20 }}>
-              <div style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#444", marginBottom: 16 }}>
+              <div style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#999", marginBottom: 16 }}>
                 Script Editor
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -667,7 +667,7 @@ export default function Page() {
                       <span style={{ fontSize: 10, color: "#e8ff47", fontFamily: "Syne, sans-serif", fontWeight: 700 }}>
                         {String(i + 1).padStart(2, "0")}
                       </span>
-                      <span style={{ fontSize: 11, color: "#555" }}>{cut.role}</span>
+                      <span style={{ fontSize: 11, color: "#aaa" }}>{cut.role}</span>
                     </div>
                     <input
                       value={editingCuts.current[i]?.line1 ?? cut.line1}
@@ -730,7 +730,7 @@ export default function Page() {
               alignItems: "center", gap: 12, textAlign: "center",
             }}>
               <div style={{ fontSize: 32 }}>🎬</div>
-              <div style={{ fontSize: 14, color: "#555" }}>
+              <div style={{ fontSize: 14, color: "#aaa" }}>
                 왼쪽에서 설정을 완료하고<br />생성 버튼을 눌러줘.
               </div>
             </div>
@@ -746,7 +746,7 @@ export default function Page() {
               <div style={{ width: "100%", height: 2, background: "#111", borderRadius: 2, overflow: "hidden" }}>
                 <div className="shimmer" style={{ height: "100%" }} />
               </div>
-              <div style={{ fontSize: 13, color: "#555" }}>AI가 설득형 스크립트를 작성하고 있어...</div>
+              <div style={{ fontSize: 13, color: "#aaa" }}>AI가 설득형 스크립트를 작성하고 있어...</div>
             </div>
           )}
         </div>
@@ -759,7 +759,7 @@ export default function Page() {
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ background: "#0d0d0d", border: "1px solid #111", borderRadius: 16, padding: 20 }}>
-      <div style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "#333", marginBottom: 16, fontFamily: "Syne, sans-serif", fontWeight: 700 }}>
+      <div style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "#888", marginBottom: 16, fontFamily: "Syne, sans-serif", fontWeight: 700 }}>
         {label}
       </div>
       {children}
@@ -769,7 +769,7 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ fontSize: 11, color: "#555", letterSpacing: "0.06em", marginBottom: 6, textTransform: "uppercase" }}>
+    <div style={{ fontSize: 11, color: "#aaa", letterSpacing: "0.06em", marginBottom: 6, textTransform: "uppercase" }}>
       {children}
     </div>
   );
