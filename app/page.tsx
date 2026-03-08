@@ -81,20 +81,50 @@ const REEL_H = 1920;
 const CUT_DURATION = 2.5; // seconds per cut
 const FPS = 30;
 
-// 텍스트 자동 줄바꿈 헬퍼
+// 텍스트 자동 줄바꿈 헬퍼 (어절 단위 우선)
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   if (!text) return [];
   if (ctx.measureText(text).width <= maxWidth) return [text];
+
+  const words = text.split(" ");
+  // 어절이 여러 개면 어절 단위로 줄바꿈 시도
+  if (words.length > 1) {
+    const lines: string[] = [];
+    let current = "";
+    for (const word of words) {
+      const test = current ? current + " " + word : word;
+      if (ctx.measureText(test).width > maxWidth && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = test;
+      }
+    }
+    if (current) lines.push(current);
+    // 어절 단위로 나눠도 여전히 넘치는 줄은 글자 단위로 재처리
+    return lines.flatMap((line) => {
+      if (ctx.measureText(line).width <= maxWidth) return [line];
+      const chars: string[] = [];
+      let cur = "";
+      for (const ch of line) {
+        const t = cur + ch;
+        if (ctx.measureText(t).width > maxWidth && cur) {
+          chars.push(cur); cur = ch;
+        } else { cur = t; }
+      }
+      if (cur) chars.push(cur);
+      return chars;
+    });
+  }
+
+  // 어절 없는 경우 글자 단위
   const lines: string[] = [];
   let current = "";
   for (const char of text) {
     const test = current + char;
     if (ctx.measureText(test).width > maxWidth && current.length > 0) {
-      lines.push(current);
-      current = char;
-    } else {
-      current = test;
-    }
+      lines.push(current); current = char;
+    } else { current = test; }
   }
   if (current) lines.push(current);
   return lines;
