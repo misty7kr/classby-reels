@@ -253,8 +253,8 @@ export default function Page() {
   const drawPreview = useCallback((cutIdx: number, progress: number) => {
     const canvas = previewCanvasRef.current;
     if (!canvas || !result) return;
-    const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
-    if (!ctx) { setIsExporting(false); return; }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
     const cut = editingCuts.current[cutIdx] || result.cuts[cutIdx];
     if (!cut) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -298,8 +298,9 @@ export default function Page() {
 
     const canvas = canvasRef.current;
     if (!canvas) { setIsExporting(false); return; }
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d") as CanvasRenderingContext2D | null;
     if (!ctx) { setIsExporting(false); return; }
+    const safeCtx = ctx as CanvasRenderingContext2D;
 
     try {
       const stream = canvas.captureStream(FPS);
@@ -327,7 +328,7 @@ export default function Page() {
           const cutFrame = frame % (CUT_DURATION * FPS);
           const progress = cutFrame / (CUT_DURATION * FPS);
           const cut = editingCuts.current[cutIdx];
-          drawCut(ctx, cut, result.theme as ThemeKey, result.accentColor, progress);
+          drawCut(safeCtx, cut, result.theme as ThemeKey, result.accentColor, progress);
           setExportProgress(Math.round((frame / totalFrames) * 100));
           frame++;
           setTimeout(renderFrame, 1000 / FPS);
