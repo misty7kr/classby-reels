@@ -253,8 +253,8 @@ export default function Page() {
   const drawPreview = useCallback((cutIdx: number, progress: number) => {
     const canvas = previewCanvasRef.current;
     if (!canvas || !result) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
+    if (!ctx) { setIsExporting(false); return; }
     const cut = editingCuts.current[cutIdx] || result.cuts[cutIdx];
     if (!cut) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
