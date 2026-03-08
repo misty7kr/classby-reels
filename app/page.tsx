@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // ── 타입 ──────────────────────────────────────────────
 type ApiMode = "openai" | "anthropic" | "hybrid";
 type Tone = "empathy" | "factbomb" | "compare" | "curiosity" | "story";
-type ThemeKey = "dark_gradient" | "light_minimal" | "neon_dark" | "warm_gradient";
+type ThemeKey = string;
 
 interface Cut {
   id: number;
@@ -21,42 +21,48 @@ interface GenerateResult {
 }
 
 // ── 테마 정의 ──────────────────────────────────────────
-const THEMES: Record<ThemeKey, {
-  bg: string[];        // gradient stops
+const THEMES: Record<string, {
+  bg: string[];
   textColor: string;
   subColor: string;
   badgeBg: string;
   badgeText: string;
 }> = {
-  dark_gradient: {
-    bg: ["#0d0d0d", "#1a1a2e", "#16213e"],
-    textColor: "#ffffff",
-    subColor: "#aaaacc",
-    badgeBg: "rgba(255,255,255,0.08)",
-    badgeText: "#8888bb",
-  },
-  light_minimal: {
-    bg: ["#f8f8f6", "#f0ede8", "#e8e4de"],
-    textColor: "#111111",
-    subColor: "#666666",
-    badgeBg: "rgba(0,0,0,0.06)",
-    badgeText: "#888888",
-  },
-  neon_dark: {
-    bg: ["#040408", "#0a0a18", "#050510"],
-    textColor: "#e8ff47",
-    subColor: "#7777aa",
-    badgeBg: "rgba(232,255,71,0.08)",
-    badgeText: "#556633",
-  },
-  warm_gradient: {
-    bg: ["#1a0a00", "#2d1500", "#1a0800"],
-    textColor: "#fff4e6",
-    subColor: "#cc9966",
-    badgeBg: "rgba(255,200,100,0.1)",
-    badgeText: "#997744",
-  },
+  dark_gradient:   { bg: ["#0d0d0d","#1a1a2e","#16213e"],   textColor: "#ffffff", subColor: "#aaaacc", badgeBg: "rgba(255,255,255,0.08)", badgeText: "#8888bb" },
+  light_minimal:   { bg: ["#f8f8f6","#f0ede8","#e8e4de"],   textColor: "#111111", subColor: "#666666", badgeBg: "rgba(0,0,0,0.06)",       badgeText: "#888888" },
+  neon_dark:       { bg: ["#040408","#0a0a18","#050510"],   textColor: "#e8ff47", subColor: "#7777aa", badgeBg: "rgba(232,255,71,0.08)",  badgeText: "#556633" },
+  warm_gradient:   { bg: ["#1a0a00","#2d1500","#1a0800"],   textColor: "#fff4e6", subColor: "#cc9966", badgeBg: "rgba(255,200,100,0.1)",  badgeText: "#997744" },
+  // 추가 테마
+  purple_dark:     { bg: ["#0d0014","#1a0030","#0d001a"],   textColor: "#e8d5ff", subColor: "#9966cc", badgeBg: "rgba(200,150,255,0.1)", badgeText: "#9966cc" },
+  green_neon:      { bg: ["#001a0a","#003018","#001a0d"],   textColor: "#39ff88", subColor: "#66bb88", badgeBg: "rgba(57,255,136,0.08)", badgeText: "#226644" },
+  red_passion:     { bg: ["#1a0000","#2d0800","#1a0000"],   textColor: "#ffffff", subColor: "#ff9988", badgeBg: "rgba(255,80,60,0.1)",   badgeText: "#cc4433" },
+  ocean_blue:      { bg: ["#001428","#002244","#001830"],   textColor: "#a8d8ff", subColor: "#5599cc", badgeBg: "rgba(100,180,255,0.1)", badgeText: "#336699" },
+  rose_gold:       { bg: ["#1a0a0a","#2d1520","#1a0d14"],   textColor: "#ffd4c8", subColor: "#cc8877", badgeBg: "rgba(255,180,160,0.1)", badgeText: "#995544" },
+  midnight_teal:   { bg: ["#001414","#002828","#001818"],   textColor: "#88ffee", subColor: "#44bbaa", badgeBg: "rgba(80,255,220,0.08)", badgeText: "#226655" },
+  gold_black:      { bg: ["#0a0800","#1a1400","#0d0a00"],   textColor: "#ffd700", subColor: "#ccaa44", badgeBg: "rgba(255,215,0,0.08)",  badgeText: "#886622" },
+  soft_pink:       { bg: ["#1a0a10","#2d1520","#1a0d18"],   textColor: "#ffb3cc", subColor: "#cc7799", badgeBg: "rgba(255,150,180,0.1)", badgeText: "#994466" },
+  cream_dark:      { bg: ["#f5f0e8","#ede8dc","#e5dfd0"],   textColor: "#2a1f0a", subColor: "#7a6a50", badgeBg: "rgba(0,0,0,0.06)",      badgeText: "#6a5a40" },
+  slate_gray:      { bg: ["#0f1318","#181e25","#0f1318"],   textColor: "#d0dde8", subColor: "#8899aa", badgeBg: "rgba(150,180,210,0.1)", badgeText: "#6677aa" },
+  electric_blue:   { bg: ["#000814","#001440","#000a28"],   textColor: "#00c8ff", subColor: "#0066aa", badgeBg: "rgba(0,200,255,0.08)",  badgeText: "#004488" },
 };
+
+const THEME_OPTIONS: { key: string; label: string; preview: string[] }[] = [
+  { key: "dark_gradient",  label: "다크 블루",    preview: ["#0d0d0d","#1a1a2e"] },
+  { key: "light_minimal",  label: "화이트",       preview: ["#f8f8f6","#e8e4de"] },
+  { key: "neon_dark",      label: "네온 옐로",    preview: ["#040408","#0a0a18"] },
+  { key: "warm_gradient",  label: "딥 브라운",    preview: ["#1a0a00","#2d1500"] },
+  { key: "purple_dark",    label: "퍼플",         preview: ["#0d0014","#1a0030"] },
+  { key: "green_neon",     label: "네온 그린",    preview: ["#001a0a","#003018"] },
+  { key: "red_passion",    label: "레드",         preview: ["#1a0000","#2d0800"] },
+  { key: "ocean_blue",     label: "오션 블루",    preview: ["#001428","#002244"] },
+  { key: "rose_gold",      label: "로즈 골드",    preview: ["#1a0a0a","#2d1520"] },
+  { key: "midnight_teal",  label: "틸",           preview: ["#001414","#002828"] },
+  { key: "gold_black",     label: "골드 블랙",    preview: ["#0a0800","#1a1400"] },
+  { key: "soft_pink",      label: "소프트 핑크",  preview: ["#1a0a10","#2d1520"] },
+  { key: "cream_dark",     label: "크림",         preview: ["#f5f0e8","#e5dfd0"] },
+  { key: "slate_gray",     label: "슬레이트",     preview: ["#0f1318","#181e25"] },
+  { key: "electric_blue",  label: "일렉트릭",     preview: ["#000814","#001440"] },
+];
 
 const TONE_OPTIONS: { value: Tone; label: string; desc: string }[] = [
   { value: "empathy",   label: "공감형",   desc: "학부모/학생 고민에 공감하며 시작" },
@@ -234,6 +240,9 @@ export default function Page() {
   const [editingCutsState, setEditingCutsState] = useState<Cut[]>([]);
   const [exportStatus, setExportStatus] = useState("");
 
+  // 테마
+  const [selectedTheme, setSelectedTheme] = useState<ThemeKey>("dark_gradient");
+
   // TTS
   const [ttsLoading, setTtsLoading] = useState(false);
   const [ttsReady, setTtsReady]     = useState(false);
@@ -296,6 +305,7 @@ export default function Page() {
       editingCuts.current = data.cuts;
       setEditingCutsState(data.cuts);
       setActiveCut(0);
+      if (data.theme) setSelectedTheme(data.theme as ThemeKey);
       generateTTS(data.cuts);
     } catch (e: unknown) { setErr(e instanceof Error ? e.message : "오류"); }
     finally { setLoading(false); }
@@ -338,7 +348,7 @@ export default function Page() {
     const cut = editingCuts.current[cutIdx] || result.cuts[cutIdx];
     if (!cut) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawCut(ctx, cut, result.theme as ThemeKey, result.accentColor, progress);
+    drawCut(ctx, cut, selectedTheme, result.accentColor, progress);
   }, [result]);
 
   useEffect(() => {
@@ -445,7 +455,7 @@ export default function Page() {
           const cutFrame = frame % (CUT_DURATION * FPS);
           const progress = cutFrame / (CUT_DURATION * FPS);
           const cut = editingCuts.current[cutIdx];
-          drawCut(safeCtx, cut, exportResult.theme as ThemeKey, exportResult.accentColor, progress);
+          drawCut(safeCtx, cut, selectedTheme, exportResult.accentColor, progress);
           setExportProgress(Math.round((frame / totalFrames) * 100));
           frame++;
           setTimeout(renderFrame, 1000 / FPS);
@@ -781,6 +791,43 @@ export default function Page() {
                 </div>
               )}
             </div>
+
+            {/* 테마 선택 */}
+            {result && (
+              <div style={{ width: "100%" }}>
+                <div style={{ fontSize: 10, color: "#555", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>배경 테마</div>
+                <div style={{
+                  display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6,
+                  maxHeight: 120, overflowY: "auto",
+                }}>
+                  {THEME_OPTIONS.map((t) => (
+                    <button
+                      key={t.key}
+                      title={t.label}
+                      onClick={() => {
+                        setSelectedTheme(t.key);
+                        setTimeout(() => drawPreview(activeCut, 1), 0);
+                      }}
+                      style={{
+                        height: 44, borderRadius: 8,
+                        border: `2px solid ${selectedTheme === t.key ? "#e8ff47" : "transparent"}`,
+                        cursor: "pointer", padding: "4px 2px",
+                        background: `linear-gradient(135deg, ${t.preview[0]}, ${t.preview[1]})`,
+                        display: "flex", alignItems: "flex-end", justifyContent: "center",
+                      }}
+                    >
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, lineHeight: 1,
+                        color: ["light_minimal","cream_dark"].includes(t.key) ? "#222" : "#fff",
+                        letterSpacing: "0.02em", textShadow: "0 1px 2px rgba(0,0,0,0.5)",
+                      }}>
+                        {t.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* 9:16 canvas container */}
             <div style={{
