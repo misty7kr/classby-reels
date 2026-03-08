@@ -312,23 +312,24 @@ export default function Page() {
       const chunks: Blob[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
+      const exportResult = result;
       await new Promise<void>((resolve) => {
         recorder.onstop = () => resolve();
         recorder.start();
 
-        const totalFrames = result.cuts.length * CUT_DURATION * FPS;
+        const totalFrames = exportResult.cuts.length * CUT_DURATION * FPS;
         let frame = 0;
 
         function renderFrame() {
           if (frame >= totalFrames) { recorder.stop(); return; }
           const cutIdx = Math.min(
             Math.floor(frame / (CUT_DURATION * FPS)),
-            result!.cuts.length - 1
+            exportResult.cuts.length - 1
           );
           const cutFrame = frame % (CUT_DURATION * FPS);
           const progress = cutFrame / (CUT_DURATION * FPS);
           const cut = editingCuts.current[cutIdx];
-          drawCut(safeCtx, cut, result.theme as ThemeKey, result.accentColor, progress);
+          drawCut(safeCtx, cut, exportResult.theme as ThemeKey, exportResult.accentColor, progress);
           setExportProgress(Math.round((frame / totalFrames) * 100));
           frame++;
           setTimeout(renderFrame, 1000 / FPS);
