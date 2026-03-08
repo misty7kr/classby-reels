@@ -228,6 +228,24 @@ export default function Page() {
   const [selectedVoice, setSelectedVoice] = useState<VoiceId>("93nuHbke4dTER9x2pDwE");
   const audioBufferRef = useRef<ArrayBuffer | null>(null);
 
+  // ── localStorage 키 저장/로드 ────────────────────
+  useEffect(() => {
+    const savedOpenai = localStorage.getItem("classby_openai_key");
+    const savedAnthropic = localStorage.getItem("classby_anthropic_key");
+    const savedMode = localStorage.getItem("classby_api_mode") as ApiMode | null;
+    const savedVoice = localStorage.getItem("classby_voice_id") as VoiceId | null;
+    if (savedOpenai) setOpenaiKey(savedOpenai);
+    if (savedAnthropic) setAnthropicKey(savedAnthropic);
+    if (savedMode) setApiMode(savedMode);
+    if (savedVoice) setSelectedVoice(savedVoice);
+  }, []);
+
+  // 키 변경 시 자동 저장
+  useEffect(() => { if (openaiKey) localStorage.setItem("classby_openai_key", openaiKey); }, [openaiKey]);
+  useEffect(() => { if (anthropicKey) localStorage.setItem("classby_anthropic_key", anthropicKey); }, [anthropicKey]);
+  useEffect(() => { localStorage.setItem("classby_api_mode", apiMode); }, [apiMode]);
+  useEffect(() => { localStorage.setItem("classby_voice_id", selectedVoice); }, [selectedVoice]);
+
   // ── Auth ──────────────────────────────────────────
   async function doAuth() {
     setAuthLoading(true); setAuthErr(null);
@@ -558,11 +576,23 @@ export default function Page() {
                 <FieldLabel>OpenAI API Key</FieldLabel>
                 <input type="password" value={openaiKey} onChange={(e) => setOpenaiKey(e.target.value)} placeholder="sk-..." />
                 {apiMode === "openai" && (
-                  <select value={openaiModel} onChange={(e) => setOpenaiModel(e.target.value)} style={{ marginTop: 6 }}>
-                    <option value="gpt-4o-mini">gpt-4o-mini (빠름·저렴)</option>
-                    <option value="gpt-4o">gpt-4o (고품질)</option>
-                    <option value="gpt-4.1-mini">gpt-4.1-mini</option>
-                  </select>
+                  <>
+                    <select value={openaiModel} onChange={(e) => setOpenaiModel(e.target.value)} style={{ marginTop: 6 }}>
+                      <option value="gpt-4o-mini">gpt-4o-mini (빠름·저렴)</option>
+                      <option value="gpt-4o">gpt-4o (고품질)</option>
+                      <option value="gpt-4.1-mini">gpt-4.1-mini</option>
+                    </select>
+                    {openaiKey && (
+                      <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#e8ff47" }} />
+                        <span style={{ fontSize: 11, color: "#e8ff47" }}>브라우저에 저장됨</span>
+                        <button onClick={() => { setOpenaiKey(""); localStorage.removeItem("classby_openai_key"); }}
+                          style={{ marginLeft: "auto", fontSize: 10, color: "#555", background: "transparent", border: "none", cursor: "pointer" }}>
+                          삭제
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -570,6 +600,16 @@ export default function Page() {
               <div>
                 <FieldLabel>Anthropic API Key</FieldLabel>
                 <input type="password" value={anthropicKey} onChange={(e) => setAnthropicKey(e.target.value)} placeholder="sk-ant-..." />
+                {anthropicKey && (
+                  <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#e8ff47" }} />
+                    <span style={{ fontSize: 11, color: "#e8ff47" }}>브라우저에 저장됨</span>
+                    <button onClick={() => { setAnthropicKey(""); localStorage.removeItem("classby_anthropic_key"); }}
+                      style={{ marginLeft: "auto", fontSize: 10, color: "#555", background: "transparent", border: "none", cursor: "pointer" }}>
+                      삭제
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </Section>
