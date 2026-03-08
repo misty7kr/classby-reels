@@ -72,7 +72,7 @@ const TONE_OPTIONS: { value: Tone; label: string; desc: string }[] = [
   { value: "story",     label: "스토리형", desc: "실제 사례처럼 감성적 전개" },
 ];
 
-const SUBJECT_OPTIONS = ["영어","수학","국어","과학","사회","논술","코딩","전과목"];
+const SUBJECT_OPTIONS = ["영어","수학","국어","과학","사회","논술","코딩","전과목","관리형독서실"];
 const GRADE_OPTIONS   = ["초등 전체","초등 저학년","초등 고학년","중등 전체","중1","중2","중3","고등 전체","고1","고2","고3","재수·N수"];
 
 // ── Canvas 렌더 유틸 ──────────────────────────────────
@@ -252,21 +252,33 @@ export default function Page() {
 
   // ── localStorage 키 저장/로드 ────────────────────
   useEffect(() => {
-    const savedOpenai = localStorage.getItem("classby_openai_key");
+    const savedOpenai    = localStorage.getItem("classby_openai_key");
     const savedAnthropic = localStorage.getItem("classby_anthropic_key");
-    const savedMode = localStorage.getItem("classby_api_mode") as ApiMode | null;
-    const savedVoice = localStorage.getItem("classby_voice_id") as VoiceId | null;
-    if (savedOpenai) setOpenaiKey(savedOpenai);
+    const savedMode      = localStorage.getItem("classby_api_mode") as ApiMode | null;
+    const savedVoice     = localStorage.getItem("classby_voice_id") as VoiceId | null;
+    const savedAcademy   = localStorage.getItem("classby_academy_name");
+    const savedRegion    = localStorage.getItem("classby_region");
+    const savedSubject   = localStorage.getItem("classby_subject");
+    if (savedOpenai)    setOpenaiKey(savedOpenai);
     if (savedAnthropic) setAnthropicKey(savedAnthropic);
-    if (savedMode) setApiMode(savedMode);
-    if (savedVoice) setSelectedVoice(savedVoice);
+    if (savedMode)      setApiMode(savedMode);
+    if (savedVoice)     setSelectedVoice(savedVoice);
+    if (savedAcademy)   setAcademyName(savedAcademy);
+    if (savedRegion)    setRegion(savedRegion);
+    if (savedSubject)   setSubject(savedSubject);
+    const savedGrade = localStorage.getItem("classby_grade");
+    if (savedGrade)     setGrade(savedGrade);
   }, []);
 
-  // 키 변경 시 자동 저장
-  useEffect(() => { if (openaiKey) localStorage.setItem("classby_openai_key", openaiKey); }, [openaiKey]);
+  // 변경 시 자동 저장
+  useEffect(() => { if (openaiKey)    localStorage.setItem("classby_openai_key", openaiKey); }, [openaiKey]);
   useEffect(() => { if (anthropicKey) localStorage.setItem("classby_anthropic_key", anthropicKey); }, [anthropicKey]);
   useEffect(() => { localStorage.setItem("classby_api_mode", apiMode); }, [apiMode]);
   useEffect(() => { localStorage.setItem("classby_voice_id", selectedVoice); }, [selectedVoice]);
+  useEffect(() => { if (academyName)  localStorage.setItem("classby_academy_name", academyName); }, [academyName]);
+  useEffect(() => { if (region)       localStorage.setItem("classby_region", region); }, [region]);
+  useEffect(() => { localStorage.setItem("classby_subject", subject); }, [subject]);
+  useEffect(() => { localStorage.setItem("classby_grade", grade); }, [grade]);
 
   // ── Auth ──────────────────────────────────────────
   async function doAuth() {
