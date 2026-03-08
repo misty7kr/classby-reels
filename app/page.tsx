@@ -359,7 +359,7 @@ export default function Page() {
     if (!cut) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawCut(ctx, cut, selectedTheme, result.accentColor, progress);
-  }, [result]);
+  }, [result, selectedTheme]);
 
   useEffect(() => {
     if (result) {
@@ -367,6 +367,11 @@ export default function Page() {
       drawPreview(0, 1);
     }
   }, [result, drawPreview]);
+
+  // 테마 변경 시 즉시 리드로우
+  useEffect(() => {
+    if (result) drawPreview(activeCut, 1);
+  }, [selectedTheme]);
 
   useEffect(() => {
     if (!isPlaying || !result) return;
