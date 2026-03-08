@@ -247,6 +247,7 @@ export default function Page() {
   const [ttsLoading, setTtsLoading] = useState(false);
   const [ttsReady, setTtsReady]     = useState(false);
   const [ttsProgress, setTtsProgress] = useState(0); // 0~5 몇 컷 완료됐는지
+  const [ttsStale, setTtsStale] = useState(false); // 텍스트 수정 후 재생성 필요
   const [selectedVoice, setSelectedVoice] = useState<VoiceId>("93nuHbke4dTER9x2pDwE");
   const audioBuffersRef = useRef<(ArrayBuffer | null)[]>([]); // 컷별 mp3
 
@@ -354,6 +355,7 @@ export default function Page() {
         setTtsProgress(i + 1);
       }
       setTtsReady(true);
+      setTtsStale(false);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "TTS 오류");
     } finally {
@@ -955,6 +957,7 @@ export default function Page() {
                         updated[i] = { ...updated[i], line1: e.target.value };
                         editingCuts.current = updated;
                         setEditingCutsState([...updated]);
+                        setTtsStale(true);
                         drawPreview(i, 1);
                       }}
                       style={{ marginBottom: 6, fontSize: 13, padding: "6px 10px" }}
@@ -968,6 +971,7 @@ export default function Page() {
                         updated[i] = { ...updated[i], line2: e.target.value };
                         editingCuts.current = updated;
                         setEditingCutsState([...updated]);
+                        setTtsStale(true);
                         drawPreview(i, 1);
                       }}
                       style={{ fontSize: 13, padding: "6px 10px" }}
@@ -985,24 +989,40 @@ export default function Page() {
             <div style={{
               display: "flex", alignItems: "center", gap: 8,
               padding: "10px 14px",
-              background: ttsReady ? "rgba(232,255,71,0.06)" : "#0a0a0a",
-              border: `1px solid ${ttsReady ? "rgba(232,255,71,0.15)" : "#111"}`,
+              background: ttsStale ? "rgba(255,107,53,0.08)" : ttsReady ? "rgba(232,255,71,0.06)" : "#0a0a0a",
+              border: `1px solid ${ttsStale ? "rgba(255,107,53,0.4)" : ttsReady ? "rgba(232,255,71,0.15)" : "#111"}`,
               borderRadius: 10,
+              transition: "all 0.2s",
             }}>
               <div style={{
                 width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
-                background: ttsReady ? "#e8ff47" : ttsLoading ? "#ff6b35" : "#333",
+                background: ttsStale ? "#ff6b35" : ttsReady ? "#e8ff47" : ttsLoading ? "#ff6b35" : "#333",
               }} />
-              <span style={{ fontSize: 12, color: ttsReady ? "#e8ff47" : ttsLoading ? "#ff6b35" : "#555", flex: 1 }}>
-                {ttsReady ? "음성 준비 완료 (컷별 싱크)" : ttsLoading ? `음성 생성 중... ${ttsProgress}/5` : "음성 없음"}
+              <span style={{ fontSize: 12, flex: 1,
+                color: ttsStale ? "#ff9966" : ttsReady ? "#e8ff47" : ttsLoading ? "#ff6b35" : "#555"
+              }}>
+                {ttsLoading
+                  ? `음성 생성 중... ${ttsProgress}/5`
+                  : ttsStale
+                  ? "텍스트가 변경됐어요 — 음성 재생성 필요"
+                  : ttsReady
+                  ? "음성 준비 완료 (컷별 싱크)"
+                  : "음성 없음"}
               </span>
-              {!ttsLoading && result && (
-                <button onClick={() => generateTTS(editingCuts.current, selectedVoice)} style={{
-                  fontSize: 11, color: "#888",
-                  background: "transparent", border: "1px solid #222",
-                  borderRadius: 6, padding: "3px 10px", cursor: "pointer",
-                }}>
-                  재생성
+              {!ttsLoading && (
+                <button
+                  onClick={() => generateTTS(editingCuts.current, selectedVoice)}
+                  style={{
+                    fontSize: 11,
+                    color: ttsStale ? "#000" : "#888",
+                    background: ttsStale ? "#ff6b35" : "transparent",
+                    border: `1px solid ${ttsStale ? "#ff6b35" : "#222"}`,
+                    borderRadius: 6, padding: "4px 12px", cursor: "pointer",
+                    fontWeight: ttsStale ? 700 : 400,
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {ttsStale ? "음성 재생성" : "재생성"}
                 </button>
               )}
             </div>
