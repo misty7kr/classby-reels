@@ -207,6 +207,12 @@ export default function Page() {
   const [exportProgress, setExportProgress] = useState(0);
   const animFrameRef = useRef<number>(0);
   const editingCuts = useRef<Cut[]>([]);
+  const [exportStatus, setExportStatus] = useState("");
+
+  // TTS
+  const [ttsLoading, setTtsLoading] = useState(false);
+  const [ttsReady, setTtsReady]     = useState(false);
+  const audioBufferRef = useRef<ArrayBuffer | null>(null);
 
   // ── Auth ──────────────────────────────────────────
   async function doAuth() {
@@ -245,8 +251,39 @@ export default function Page() {
       setResult(data);
       editingCuts.current = data.cuts;
       setActiveCut(0);
+      // 카피 생성 직후 자동으로 TTS 생성
+      generateTTS(data.cuts);
     } catch (e: unknown) { setErr(e instanceof Error ? e.message : "오류"); }
     finally { setLoading(false); }
+  }
+
+  // ── TTS 생성 ──────────────────────────────────────
+  async function generateTTS(cuts: Cut[]) {
+    setTtsLoading(true); setTtsReady(false); audioBufferRef.current = null;
+    try {
+      // 모든 컷 텍스트를 하나의 스크립트로 합치기
+      const script = cuts.map((c) => {
+        const t = [c.line1, c.line2].filter(Boolean).join(" ");
+        return t;
+      }).join(". ");
+
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: script }),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e?.error || "TTS 실패");
+      }
+      const buf = await res.arrayBuffer();
+      audioBufferRef.current = buf;
+      setTtsReady(true);
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "TTS 오류");
+    } finally {
+      setTtsLoading(false);
+    }
   }
 
   // ── Preview Canvas draw ───────────────────────────
@@ -290,11 +327,12 @@ export default function Page() {
     return () => cancelAnimationFrame(animFrameRef.current);
   }, [isPlaying, result, drawPreview]);
 
-  // ── Export WebM ───────────────────────────────────
+  // ── Export WebM + Audio ──────────────────────────
   async function exportVideo() {
     if (!result || isExporting) return;
     setIsExporting(true);
     setExportProgress(0);
+    setExportStatus("영상 렌더링 중...");
 
     const canvas = canvasRef.current;
     if (!canvas) { setIsExporting(false); return; }
@@ -303,23 +341,53 @@ export default function Page() {
     const safeCtx = ctx as CanvasRenderingContext2D;
 
     try {
-      const stream = canvas.captureStream(FPS);
-      const recorder = new MediaRecorder(stream, {
-        mimeType: "video/webm;codecs=vp9",
+      const exportResult = result;
+      const totalFrames = exportResult.cuts.length * CUT_DURATION * FPS;
+
+      // 1) 비디오 스트림 캡처
+      const videoStream = canvas.captureStream(FPS);
+
+      // 2) 오디오 스트림 (TTS 있으면 붙이기)
+      let finalStream: MediaStream = videoStream;
+      let audioCtx: AudioContext | null = null;
+
+      if (audioBufferRef.current) {
+        setExportStatus("음성 합성 중...");
+        audioCtx = new AudioContext();
+        const decoded = await audioCtx.decodeAudioData(audioBufferRef.current.slice(0));
+        const dest = audioCtx.createMediaStreamDestination();
+        const source = audioCtx.createBufferSource();
+        source.buffer = decoded;
+        source.connect(dest);
+
+        // 비디오 + 오디오 트랙 합치기
+        const combined = new MediaStream([
+          ...videoStream.getVideoTracks(),
+          ...dest.stream.getAudioTracks(),
+        ]);
+        finalStream = combined;
+        source.start(0);
+      }
+
+      setExportStatus("영상 인코딩 중...");
+
+      // 3) MediaRecorder
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+        ? "video/webm;codecs=vp9,opus"
+        : "video/webm";
+      const recorder = new MediaRecorder(finalStream, {
+        mimeType,
         videoBitsPerSecond: 8_000_000,
       });
 
       const chunks: Blob[] = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
-      const exportResult = result;
       await new Promise<void>((resolve) => {
         recorder.onstop = () => resolve();
         recorder.start();
 
-        const totalFrames = exportResult.cuts.length * CUT_DURATION * FPS;
         let frame = 0;
-
         function renderFrame() {
           if (frame >= totalFrames) { recorder.stop(); return; }
           const cutIdx = Math.min(
@@ -337,6 +405,9 @@ export default function Page() {
         renderFrame();
       });
 
+      if (audioCtx) audioCtx.close();
+
+      setExportStatus("다운로드 준비 중...");
       const blob = new Blob(chunks, { type: "video/webm" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -344,11 +415,13 @@ export default function Page() {
       a.download = `reels_${academyName}_${Date.now()}.webm`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      alert("영상 내보내기 중 오류가 발생했어요. 브라우저를 확인해주세요.");
+    } catch (e) {
+      console.error(e);
+      alert("영상 내보내기 중 오류가 발생했어요.");
     } finally {
       setIsExporting(false);
       setExportProgress(0);
+      setExportStatus("");
     }
   }
 
@@ -699,26 +772,57 @@ export default function Page() {
             </div>
           )}
 
+          {/* TTS 상태 */}
+          {result && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "10px 14px",
+              background: ttsReady ? "rgba(232,255,71,0.06)" : "#0d0d0d",
+              border: `1px solid ${ttsReady ? "rgba(232,255,71,0.2)" : "#111"}`,
+              borderRadius: 10,
+            }}>
+              <div style={{
+                width: 8, height: 8, borderRadius: "50%",
+                background: ttsReady ? "#e8ff47" : ttsLoading ? "#ff6b35" : "#333",
+                flexShrink: 0,
+              }} />
+              <span style={{ fontSize: 12, color: ttsReady ? "#e8ff47" : ttsLoading ? "#ff6b35" : "#666" }}>
+                {ttsReady ? "음성 준비 완료" : ttsLoading ? "음성 생성 중..." : "음성 없음"}
+              </span>
+              {!ttsLoading && result && (
+                <button onClick={() => generateTTS(editingCuts.current)} style={{
+                  marginLeft: "auto", fontSize: 11, color: "#888",
+                  background: "transparent", border: "1px solid #222",
+                  borderRadius: 6, padding: "3px 10px", cursor: "pointer",
+                }}>
+                  재생성
+                </button>
+              )}
+            </div>
+          )}
+
           {/* 다운로드 버튼 */}
           {result && (
             <button
               onClick={exportVideo}
-              disabled={isExporting}
+              disabled={isExporting || ttsLoading}
               style={{
                 width: "100%", padding: "16px 0",
-                background: isExporting ? "#0e0e0e" : "#111",
-                color: isExporting ? "#555" : "#e8ff47",
+                background: (isExporting || ttsLoading) ? "#0e0e0e" : "#111",
+                color: (isExporting || ttsLoading) ? "#555" : "#e8ff47",
                 border: "1px solid #222",
                 borderRadius: 12,
                 fontFamily: "Syne, sans-serif", fontWeight: 700,
                 fontSize: 14, letterSpacing: "0.04em",
-                cursor: isExporting ? "not-allowed" : "pointer",
+                cursor: (isExporting || ttsLoading) ? "not-allowed" : "pointer",
                 transition: "all 0.2s",
               }}
             >
               {isExporting
-                ? `내보내는 중... ${exportProgress}%`
-                : "WebM 다운로드"}
+                ? `${exportStatus || "내보내는 중..."} ${exportProgress}%`
+                : ttsLoading
+                ? "음성 생성 중..."
+                : ttsReady ? "영상+음성 다운로드" : "영상만 다운로드 (무음)"}
             </button>
           )}
 
