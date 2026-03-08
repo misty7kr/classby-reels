@@ -75,16 +75,37 @@ const REEL_H = 1920;
 const CUT_DURATION = 2.5; // seconds per cut
 const FPS = 30;
 
+// 텍스트 자동 줄바꿈 헬퍼
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  if (!text) return [];
+  if (ctx.measureText(text).width <= maxWidth) return [text];
+  const lines: string[] = [];
+  let current = "";
+  for (const char of text) {
+    const test = current + char;
+    if (ctx.measureText(test).width > maxWidth && current.length > 0) {
+      lines.push(current);
+      current = char;
+    } else {
+      current = test;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
 function drawCut(
   ctx: CanvasRenderingContext2D,
   cut: Cut,
   themeKey: ThemeKey,
   accentColor: string,
-  progress: number // 0~1 fade
+  progress: number
 ) {
   const theme = THEMES[themeKey] || THEMES.dark_gradient;
   const W = REEL_W;
   const H = REEL_H;
+  const PAD = 80; // 좌우 여백
+  const maxTextW = W - PAD * 2;
 
   // Background gradient
   const grad = ctx.createLinearGradient(0, 0, W * 0.6, H);
@@ -105,7 +126,7 @@ function drawCut(
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
   }
 
-  // Accent decorative line (left edge)
+  // Accent line (left edge)
   const accentGrad = ctx.createLinearGradient(0, H * 0.3, 0, H * 0.7);
   accentGrad.addColorStop(0, "transparent");
   accentGrad.addColorStop(0.5, accentColor);
@@ -114,37 +135,27 @@ function drawCut(
   ctx.lineWidth = 4;
   ctx.beginPath(); ctx.moveTo(60, H * 0.3); ctx.lineTo(60, H * 0.7); ctx.stroke();
 
-  // Fade in alpha
+  // Fade in
   ctx.globalAlpha = Math.min(1, progress * 3);
 
-  // Role badge
-  ctx.font = `500 36px 'Noto Sans KR', sans-serif`;
-  ctx.fillStyle = theme.badgeText;
-  const roleW = ctx.measureText(cut.role).width + 40;
-  ctx.fillStyle = theme.badgeBg;
-  roundRect(ctx, W / 2 - roleW / 2, H / 2 - 220, roleW, 56, 28);
-  ctx.fill();
-  ctx.fillStyle = theme.badgeText;
-  ctx.textAlign = "center";
-  ctx.fillText(cut.role, W / 2, H / 2 - 182);
-
-  // Cut number dot
-  ctx.fillStyle = accentColor;
-  ctx.beginPath();
-  ctx.arc(W / 2, H / 2 - 270, 8, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Main text
-  const fontSize = cut.line2 ? 96 : 108;
+  // 텍스트 줄 계산 (line1 + line2 각각 wrap)
+  const fontSize = 88;
+  const lineH = fontSize * 1.35;
   ctx.font = `700 ${fontSize}px 'Noto Sans KR', sans-serif`;
-  ctx.fillStyle = theme.textColor;
   ctx.textAlign = "center";
 
-  if (cut.line2) {
-    ctx.fillText(cut.line1, W / 2, H / 2 - 40);
-    ctx.fillText(cut.line2, W / 2, H / 2 + 80);
-  } else {
-    ctx.fillText(cut.line1, W / 2, H / 2 + 30);
+  const lines1 = wrapText(ctx, cut.line1 || "", maxTextW);
+  const lines2 = cut.line2 ? wrapText(ctx, cut.line2, maxTextW) : [];
+  const allLines = [...lines1, ...(lines2.length ? [""] : []), ...lines2];
+  const totalH = allLines.length * lineH;
+  let startY = H / 2 - totalH / 2 + fontSize;
+
+  ctx.fillStyle = theme.textColor;
+  for (const line of allLines) {
+    if (line !== "") {
+      ctx.fillText(line, W / 2, startY);
+    }
+    startY += lineH;
   }
 
   // Bottom bar
@@ -220,6 +231,7 @@ export default function Page() {
   const [exportProgress, setExportProgress] = useState(0);
   const animFrameRef = useRef<number>(0);
   const editingCuts = useRef<Cut[]>([]);
+  const [editingCutsState, setEditingCutsState] = useState<Cut[]>([]);
   const [exportStatus, setExportStatus] = useState("");
 
   // TTS
@@ -282,8 +294,8 @@ export default function Page() {
       if (!res.ok) throw new Error(data?.error || "생성 실패");
       setResult(data);
       editingCuts.current = data.cuts;
+      setEditingCutsState(data.cuts);
       setActiveCut(0);
-      // 카피 생성 직후 자동으로 TTS 생성
       generateTTS(data.cuts);
     } catch (e: unknown) { setErr(e instanceof Error ? e.message : "오류"); }
     finally { setLoading(false); }
@@ -373,25 +385,25 @@ export default function Page() {
 
     try {
       const exportResult = result;
-      const totalFrames = exportResult.cuts.length * CUT_DURATION * FPS;
 
       // 1) 비디오 스트림 캡처
       const videoStream = canvas.captureStream(FPS);
 
-      // 2) 오디오 스트림 (TTS 있으면 붙이기)
+      // 2) 오디오 스트림 + 오디오 길이에 맞게 영상 길이 결정
       let finalStream: MediaStream = videoStream;
       let audioCtx: AudioContext | null = null;
+      let audioDuration = exportResult.cuts.length * CUT_DURATION; // 기본값
 
       if (audioBufferRef.current) {
         setExportStatus("음성 합성 중...");
         audioCtx = new AudioContext();
         const decoded = await audioCtx.decodeAudioData(audioBufferRef.current.slice(0));
+        // 오디오가 더 길면 오디오 길이에 맞추고, 짧으면 기본값 유지
+        audioDuration = Math.max(decoded.duration + 0.5, audioDuration);
         const dest = audioCtx.createMediaStreamDestination();
         const source = audioCtx.createBufferSource();
         source.buffer = decoded;
         source.connect(dest);
-
-        // 비디오 + 오디오 트랙 합치기
         const combined = new MediaStream([
           ...videoStream.getVideoTracks(),
           ...dest.stream.getAudioTracks(),
@@ -400,12 +412,17 @@ export default function Page() {
         source.start(0);
       }
 
+      const totalFrames = Math.ceil(audioDuration * FPS);
+
       setExportStatus("영상 인코딩 중...");
 
-      // 3) MediaRecorder
-      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
-        ? "video/webm;codecs=vp9,opus"
+      // 3) MediaRecorder - MP4 우선, 안되면 WebM
+      const mp4Type = "video/mp4;codecs=avc1";
+      const webmType = "video/webm;codecs=vp9,opus";
+      const mimeType = MediaRecorder.isTypeSupported(mp4Type) ? mp4Type
+        : MediaRecorder.isTypeSupported(webmType) ? webmType
         : "video/webm";
+      const isMP4 = mimeType.startsWith("video/mp4");
       const recorder = new MediaRecorder(finalStream, {
         mimeType,
         videoBitsPerSecond: 8_000_000,
@@ -439,13 +456,17 @@ export default function Page() {
       if (audioCtx) audioCtx.close();
 
       setExportStatus("다운로드 준비 중...");
-      const blob = new Blob(chunks, { type: "video/webm" });
+      const ext = isMP4 ? "mp4" : "webm";
+      const blob = new Blob(chunks, { type: mimeType });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `reels_${academyName}_${Date.now()}.webm`;
+      a.download = `reels_${academyName}_${Date.now()}.${ext}`;
       a.click();
       URL.revokeObjectURL(url);
+      if (!isMP4) {
+        alert("이 브라우저는 MP4를 지원하지 않아 WebM으로 저장됐어요.\nInstagram 업로드 전 MP4로 변환이 필요해요.\n(변환: cloudconvert.com)");
+      }
     } catch (e) {
       console.error(e);
       alert("영상 내보내기 중 오류가 발생했어요.");
@@ -825,11 +846,12 @@ export default function Page() {
                       <span style={{ fontSize: 11, color: "#aaa" }}>{cut.role}</span>
                     </div>
                     <input
-                      value={editingCuts.current[i]?.line1 ?? cut.line1}
+                      value={editingCutsState[i]?.line1 ?? cut.line1}
                       onChange={(e) => {
                         const updated = [...editingCuts.current];
                         updated[i] = { ...updated[i], line1: e.target.value };
                         editingCuts.current = updated;
+                        setEditingCutsState([...updated]);
                         drawPreview(i, 1);
                       }}
                       style={{ marginBottom: 6, fontSize: 13, padding: "6px 10px" }}
@@ -837,11 +859,12 @@ export default function Page() {
                       onClick={(e) => e.stopPropagation()}
                     />
                     <input
-                      value={editingCuts.current[i]?.line2 ?? cut.line2}
+                      value={editingCutsState[i]?.line2 ?? cut.line2}
                       onChange={(e) => {
                         const updated = [...editingCuts.current];
                         updated[i] = { ...updated[i], line2: e.target.value };
                         editingCuts.current = updated;
+                        setEditingCutsState([...updated]);
                         drawPreview(i, 1);
                       }}
                       style={{ fontSize: 13, padding: "6px 10px" }}
