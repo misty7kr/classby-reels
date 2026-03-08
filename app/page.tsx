@@ -246,8 +246,9 @@ export default function Page() {
   // TTS
   const [ttsLoading, setTtsLoading] = useState(false);
   const [ttsReady, setTtsReady]     = useState(false);
+  const [ttsProgress, setTtsProgress] = useState(0); // 0~5 몇 컷 완료됐는지
   const [selectedVoice, setSelectedVoice] = useState<VoiceId>("93nuHbke4dTER9x2pDwE");
-  const audioBufferRef = useRef<ArrayBuffer | null>(null);
+  const audioBuffersRef = useRef<(ArrayBuffer | null)[]>([]); // 컷별 mp3
 
   // ── localStorage 키 저장/로드 ────────────────────
   useEffect(() => {
@@ -311,26 +312,35 @@ export default function Page() {
     finally { setLoading(false); }
   }
 
-  // ── TTS 생성 ──────────────────────────────────────
+  // ── TTS 생성 (컷별 순차) ─────────────────────────
   async function generateTTS(cuts: Cut[], voiceId?: string) {
-    setTtsLoading(true); setTtsReady(false); audioBufferRef.current = null;
-    try {
-      const script = cuts.map((c) => {
-        const t = [c.line1, c.line2].filter(Boolean).join(" ");
-        return t;
-      }).join(". ");
+    setTtsLoading(true);
+    setTtsReady(false);
+    setTtsProgress(0);
+    audioBuffersRef.current = new Array(cuts.length).fill(null);
 
-      const res = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: script, voiceId: voiceId || selectedVoice }),
-      });
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({}));
-        throw new Error(e?.error || "TTS 실패");
+    try {
+      for (let i = 0; i < cuts.length; i++) {
+        const cut = cuts[i];
+        const text = [cut.line1, cut.line2].filter(Boolean).join(". ");
+        if (!text.trim()) {
+          audioBuffersRef.current[i] = null;
+          setTtsProgress(i + 1);
+          continue;
+        }
+
+        const res = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, voiceId: voiceId || selectedVoice }),
+        });
+        if (!res.ok) {
+          const e = await res.json().catch(() => ({}));
+          throw new Error(e?.error || `컷 ${i+1} TTS 실패`);
+        }
+        audioBuffersRef.current[i] = await res.arrayBuffer();
+        setTtsProgress(i + 1);
       }
-      const buf = await res.arrayBuffer();
-      audioBufferRef.current = buf;
       setTtsReady(true);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "TTS 오류");
@@ -395,34 +405,50 @@ export default function Page() {
 
     try {
       const exportResult = result;
+      const audioCtx = new AudioContext();
 
-      // 1) 비디오 스트림 캡처
-      const videoStream = canvas.captureStream(FPS);
+      // 컷별 오디오 디코딩 + 각 컷 길이 계산
+      setExportStatus("음성 분석 중...");
+      const cutDurations: number[] = [];
+      const decodedBuffers: (AudioBuffer | null)[] = [];
 
-      // 2) 오디오 스트림 + 오디오 길이에 맞게 영상 길이 결정
-      let finalStream: MediaStream = videoStream;
-      let audioCtx: AudioContext | null = null;
-      let audioDuration = exportResult.cuts.length * CUT_DURATION; // 기본값
-
-      if (audioBufferRef.current) {
-        setExportStatus("음성 합성 중...");
-        audioCtx = new AudioContext();
-        const decoded = await audioCtx.decodeAudioData(audioBufferRef.current.slice(0));
-        // 오디오가 더 길면 오디오 길이에 맞추고, 짧으면 기본값 유지
-        audioDuration = Math.max(decoded.duration + 0.5, audioDuration);
-        const dest = audioCtx.createMediaStreamDestination();
-        const source = audioCtx.createBufferSource();
-        source.buffer = decoded;
-        source.connect(dest);
-        const combined = new MediaStream([
-          ...videoStream.getVideoTracks(),
-          ...dest.stream.getAudioTracks(),
-        ]);
-        finalStream = combined;
-        source.start(0);
+      for (let i = 0; i < exportResult.cuts.length; i++) {
+        const raw = audioBuffersRef.current[i];
+        if (raw) {
+          const decoded = await audioCtx.decodeAudioData(raw.slice(0));
+          decodedBuffers.push(decoded);
+          cutDurations.push(decoded.duration + 0.3); // 0.3초 여유
+        } else {
+          decodedBuffers.push(null);
+          cutDurations.push(CUT_DURATION);
+        }
       }
 
-      const totalFrames = Math.ceil(audioDuration * FPS);
+      const totalDuration = cutDurations.reduce((a, b) => a + b, 0);
+      const totalFrames = Math.ceil(totalDuration * FPS);
+
+      // 1) 비디오 스트림
+      const videoStream = canvas.captureStream(FPS);
+
+      // 2) 오디오: 컷별 순서대로 연결
+      setExportStatus("음성 합성 중...");
+      const dest = audioCtx.createMediaStreamDestination();
+      let offset = audioCtx.currentTime + 0.1;
+      for (let i = 0; i < decodedBuffers.length; i++) {
+        const buf = decodedBuffers[i];
+        if (buf) {
+          const src = audioCtx.createBufferSource();
+          src.buffer = buf;
+          src.connect(dest);
+          src.start(offset);
+        }
+        offset += cutDurations[i];
+      }
+
+      const finalStream = new MediaStream([
+        ...videoStream.getVideoTracks(),
+        ...dest.stream.getAudioTracks(),
+      ]);
 
       setExportStatus("영상 인코딩 중...");
 
@@ -445,15 +471,28 @@ export default function Page() {
         recorder.onstop = () => resolve();
         recorder.start();
 
+        // 컷별 누적 프레임 경계 계산
+        const cutFrameBounds: number[] = [];
+        let acc = 0;
+        for (const d of cutDurations) {
+          acc += Math.ceil(d * FPS);
+          cutFrameBounds.push(acc);
+        }
+
         let frame = 0;
         function renderFrame() {
           if (frame >= totalFrames) { recorder.stop(); return; }
-          const cutIdx = Math.min(
-            Math.floor(frame / (CUT_DURATION * FPS)),
-            exportResult.cuts.length - 1
-          );
-          const cutFrame = frame % (CUT_DURATION * FPS);
-          const progress = cutFrame / (CUT_DURATION * FPS);
+
+          // 현재 프레임이 어느 컷인지
+          let cutIdx = 0;
+          for (let ci = 0; ci < cutFrameBounds.length; ci++) {
+            if (frame < cutFrameBounds[ci]) { cutIdx = ci; break; }
+            cutIdx = ci;
+          }
+          const cutStart = cutIdx === 0 ? 0 : cutFrameBounds[cutIdx - 1];
+          const cutLen = cutFrameBounds[cutIdx] - cutStart;
+          const cutFrame = frame - cutStart;
+          const progress = Math.min(1, cutFrame / cutLen);
           const cut = editingCuts.current[cutIdx];
           drawCut(safeCtx, cut, selectedTheme, exportResult.accentColor, progress);
           setExportProgress(Math.round((frame / totalFrames) * 100));
@@ -463,7 +502,7 @@ export default function Page() {
         renderFrame();
       });
 
-      if (audioCtx) audioCtx.close();
+      audioCtx.close();
 
       setExportStatus("다운로드 준비 중...");
       const ext = isMP4 ? "mp4" : "webm";
@@ -938,7 +977,7 @@ export default function Page() {
                 background: ttsReady ? "#e8ff47" : ttsLoading ? "#ff6b35" : "#333",
               }} />
               <span style={{ fontSize: 12, color: ttsReady ? "#e8ff47" : ttsLoading ? "#ff6b35" : "#555", flex: 1 }}>
-                {ttsReady ? "음성 준비 완료" : ttsLoading ? "음성 생성 중..." : "음성 없음"}
+                {ttsReady ? "음성 준비 완료 (컷별 싱크)" : ttsLoading ? `음성 생성 중... ${ttsProgress}/5` : "음성 없음"}
               </span>
               {!ttsLoading && result && (
                 <button onClick={() => generateTTS(editingCuts.current, selectedVoice)} style={{
