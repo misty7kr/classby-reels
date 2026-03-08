@@ -169,6 +169,19 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
+// ── 보이스 목록 ───────────────────────────────────────
+const VOICES = [
+  { id: "ZZ4xhVcc83kZBfNIlIIz", label: "Manho · 남성 차분" },
+  { id: "6Vgh4FaCc0SCcWPwcyXa", label: "Hyein · 여성 친근" },
+  { id: "CxErO97xpQgQXYmapDKX", label: "Theo · 남성 전문가" },
+  { id: "F7wT70V3u09d2rY9pNa6", label: "Yura · 여성 에너지" },
+  { id: "5XgfKMHL4qnyg2mabE5t", label: "Steven · 남성 신뢰" },
+  { id: "m3gJBS8OofDJfycyA2Ip", label: "Taehyung · 남성 자연" },
+  { id: "U1cJYS4EdbaHmfR7YzHd", label: "Minho · 남성 강렬" },
+  { id: "93nuHbke4dTER9x2pDwE", label: "재밌는 아저씨 🎭" },
+] as const;
+type VoiceId = typeof VOICES[number]["id"];
+
 // ── 컴포넌트 ──────────────────────────────────────────
 export default function Page() {
   // Auth
@@ -212,6 +225,7 @@ export default function Page() {
   // TTS
   const [ttsLoading, setTtsLoading] = useState(false);
   const [ttsReady, setTtsReady]     = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState<VoiceId>("93nuHbke4dTER9x2pDwE");
   const audioBufferRef = useRef<ArrayBuffer | null>(null);
 
   // ── Auth ──────────────────────────────────────────
@@ -258,10 +272,9 @@ export default function Page() {
   }
 
   // ── TTS 생성 ──────────────────────────────────────
-  async function generateTTS(cuts: Cut[]) {
+  async function generateTTS(cuts: Cut[], voiceId?: string) {
     setTtsLoading(true); setTtsReady(false); audioBufferRef.current = null;
     try {
-      // 모든 컷 텍스트를 하나의 스크립트로 합치기
       const script = cuts.map((c) => {
         const t = [c.line1, c.line2].filter(Boolean).join(" ");
         return t;
@@ -270,7 +283,7 @@ export default function Page() {
       const res = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: script }),
+        body: JSON.stringify({ text: script, voiceId: voiceId || selectedVoice }),
       });
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
@@ -772,32 +785,60 @@ export default function Page() {
             </div>
           )}
 
-          {/* TTS 상태 */}
+          {/* TTS 목소리 선택 + 상태 */}
           {result && (
-            <div style={{
-              display: "flex", alignItems: "center", gap: 8,
-              padding: "10px 14px",
-              background: ttsReady ? "rgba(232,255,71,0.06)" : "#0d0d0d",
-              border: `1px solid ${ttsReady ? "rgba(232,255,71,0.2)" : "#111"}`,
-              borderRadius: 10,
-            }}>
-              <div style={{
-                width: 8, height: 8, borderRadius: "50%",
-                background: ttsReady ? "#e8ff47" : ttsLoading ? "#ff6b35" : "#333",
-                flexShrink: 0,
-              }} />
-              <span style={{ fontSize: 12, color: ttsReady ? "#e8ff47" : ttsLoading ? "#ff6b35" : "#666" }}>
-                {ttsReady ? "음성 준비 완료" : ttsLoading ? "음성 생성 중..." : "음성 없음"}
-              </span>
-              {!ttsLoading && result && (
-                <button onClick={() => generateTTS(editingCuts.current)} style={{
-                  marginLeft: "auto", fontSize: 11, color: "#888",
-                  background: "transparent", border: "1px solid #222",
-                  borderRadius: 6, padding: "3px 10px", cursor: "pointer",
-                }}>
-                  재생성
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {/* 목소리 선택 */}
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span style={{ fontSize: 11, color: "#666", letterSpacing: "0.08em", textTransform: "uppercase", flexShrink: 0 }}>목소리</span>
+                <select
+                  value={selectedVoice}
+                  onChange={(e) => {
+                    setSelectedVoice(e.target.value as VoiceId);
+                    setTtsReady(false);
+                    audioBufferRef.current = null;
+                  }}
+                  style={{
+                    flex: 1, background: "#111", color: "#ddd",
+                    border: "1px solid #222", borderRadius: 8,
+                    padding: "7px 10px", fontSize: 12,
+                    cursor: "pointer",
+                  }}
+                >
+                  {VOICES.map((v) => (
+                    <option key={v.id} value={v.id}>{v.label}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => generateTTS(editingCuts.current, selectedVoice)}
+                  disabled={ttsLoading}
+                  style={{
+                    padding: "7px 14px", fontSize: 12,
+                    background: "#0e0e0e", color: ttsLoading ? "#555" : "#e8ff47",
+                    border: "1px solid #222", borderRadius: 8,
+                    cursor: ttsLoading ? "not-allowed" : "pointer", flexShrink: 0,
+                  }}
+                >
+                  {ttsLoading ? "생성 중..." : "생성"}
                 </button>
-              )}
+              </div>
+
+              {/* 상태 표시 */}
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8,
+                padding: "8px 12px",
+                background: ttsReady ? "rgba(232,255,71,0.06)" : "#0a0a0a",
+                border: `1px solid ${ttsReady ? "rgba(232,255,71,0.15)" : "#111"}`,
+                borderRadius: 8,
+              }}>
+                <div style={{
+                  width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
+                  background: ttsReady ? "#e8ff47" : ttsLoading ? "#ff6b35" : "#333",
+                }} />
+                <span style={{ fontSize: 12, color: ttsReady ? "#e8ff47" : ttsLoading ? "#ff6b35" : "#555" }}>
+                  {ttsReady ? "음성 준비 완료 — 영상에 자동 합성됩니다" : ttsLoading ? "ElevenLabs 음성 생성 중..." : "목소리 선택 후 생성을 눌러주세요"}
+                </span>
+              </div>
             </div>
           )}
 

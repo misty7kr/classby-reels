@@ -3,12 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
-  const { text } = await req.json();
+  const { text, voiceId: bodyVoiceId } = await req.json();
 
   const apiKey = process.env.ELEVENLABS_API_KEY;
-  const voiceId = process.env.ELEVENLABS_VOICE_ID;
+  const defaultVoiceId = process.env.ELEVENLABS_VOICE_ID || "93nuHbke4dTER9x2pDwE";
+  const voiceId = bodyVoiceId || defaultVoiceId;
 
-  if (!apiKey || !voiceId) {
+  if (!apiKey) {
     return NextResponse.json({ error: "TTS not configured" }, { status: 500 });
   }
 
