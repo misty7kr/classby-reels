@@ -627,8 +627,37 @@ export default function Page() {
             </div>
           </Section>
 
+          {/* 목소리 선택 */}
+          <Section label="04 목소리 선택">
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {VOICES.map((v) => (
+                  <button
+                    key={v.id}
+                    onClick={() => setSelectedVoice(v.id as VoiceId)}
+                    style={{
+                      padding: "10px 12px",
+                      background: selectedVoice === v.id ? "#141414" : "transparent",
+                      border: `1px solid ${selectedVoice === v.id ? "#e8ff47" : "#111"}`,
+                      borderRadius: 10, textAlign: "left", cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: 8,
+                    }}
+                  >
+                    <div style={{
+                      width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+                      background: selectedVoice === v.id ? "#e8ff47" : "#222",
+                    }} />
+                    <span style={{ fontSize: 12, color: selectedVoice === v.id ? "#f0f0f0" : "#666", fontWeight: selectedVoice === v.id ? 600 : 400 }}>
+                      {v.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </Section>
+
           {/* 추가 설정 */}
-          <Section label="04 추가 설정">
+          <Section label="05 추가 설정">
             <FieldLabel>CTA 문구 (선택)</FieldLabel>
             <input value={ctaText} onChange={(e) => setCtaText(e.target.value)} placeholder={`예: ${academyName || "학원명"} 지금 상담`} style={{ marginBottom: 10 }} />
             <FieldLabel>강조 포인트 (선택)</FieldLabel>
@@ -785,60 +814,31 @@ export default function Page() {
             </div>
           )}
 
-          {/* TTS 목소리 선택 + 상태 */}
+          {/* TTS 상태 */}
           {result && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {/* 목소리 선택 */}
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <span style={{ fontSize: 11, color: "#666", letterSpacing: "0.08em", textTransform: "uppercase", flexShrink: 0 }}>목소리</span>
-                <select
-                  value={selectedVoice}
-                  onChange={(e) => {
-                    setSelectedVoice(e.target.value as VoiceId);
-                    setTtsReady(false);
-                    audioBufferRef.current = null;
-                  }}
-                  style={{
-                    flex: 1, background: "#111", color: "#ddd",
-                    border: "1px solid #222", borderRadius: 8,
-                    padding: "7px 10px", fontSize: 12,
-                    cursor: "pointer",
-                  }}
-                >
-                  {VOICES.map((v) => (
-                    <option key={v.id} value={v.id}>{v.label}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => generateTTS(editingCuts.current, selectedVoice)}
-                  disabled={ttsLoading}
-                  style={{
-                    padding: "7px 14px", fontSize: 12,
-                    background: "#0e0e0e", color: ttsLoading ? "#555" : "#e8ff47",
-                    border: "1px solid #222", borderRadius: 8,
-                    cursor: ttsLoading ? "not-allowed" : "pointer", flexShrink: 0,
-                  }}
-                >
-                  {ttsLoading ? "생성 중..." : "생성"}
-                </button>
-              </div>
-
-              {/* 상태 표시 */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "10px 14px",
+              background: ttsReady ? "rgba(232,255,71,0.06)" : "#0a0a0a",
+              border: `1px solid ${ttsReady ? "rgba(232,255,71,0.15)" : "#111"}`,
+              borderRadius: 10,
+            }}>
               <div style={{
-                display: "flex", alignItems: "center", gap: 8,
-                padding: "8px 12px",
-                background: ttsReady ? "rgba(232,255,71,0.06)" : "#0a0a0a",
-                border: `1px solid ${ttsReady ? "rgba(232,255,71,0.15)" : "#111"}`,
-                borderRadius: 8,
-              }}>
-                <div style={{
-                  width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
-                  background: ttsReady ? "#e8ff47" : ttsLoading ? "#ff6b35" : "#333",
-                }} />
-                <span style={{ fontSize: 12, color: ttsReady ? "#e8ff47" : ttsLoading ? "#ff6b35" : "#555" }}>
-                  {ttsReady ? "음성 준비 완료 — 영상에 자동 합성됩니다" : ttsLoading ? "ElevenLabs 음성 생성 중..." : "목소리 선택 후 생성을 눌러주세요"}
-                </span>
-              </div>
+                width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
+                background: ttsReady ? "#e8ff47" : ttsLoading ? "#ff6b35" : "#333",
+              }} />
+              <span style={{ fontSize: 12, color: ttsReady ? "#e8ff47" : ttsLoading ? "#ff6b35" : "#555", flex: 1 }}>
+                {ttsReady ? "음성 준비 완료" : ttsLoading ? "음성 생성 중..." : "음성 없음"}
+              </span>
+              {!ttsLoading && result && (
+                <button onClick={() => generateTTS(editingCuts.current, selectedVoice)} style={{
+                  fontSize: 11, color: "#888",
+                  background: "transparent", border: "1px solid #222",
+                  borderRadius: 6, padding: "3px 10px", cursor: "pointer",
+                }}>
+                  재생성
+                </button>
+              )}
             </div>
           )}
 
